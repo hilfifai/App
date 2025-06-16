@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>File Manager</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:100,300,400,700,900|Open+Sans:300,400,600,700,800|Source+Sans+Pro:200,300,400,600,700,900">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.theme.min.css">
+        <link rel="stylesheet" href="./style.css">
+        <style>
+.file-manager-container {
+    display: flex;
+    height: 100%;
+}
+
+
+.left-panel {
+    width: 250px;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    padding: 10px;
+}
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+}
+
+.big-file-manager {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.folder {
+    padding: 5px;
+    cursor: pointer;
+}
+
+.folder:hover {
+    background: #f0f0f0;
+}
+
+.children {
+    margin-left: 15px;
+}.rename-input {
+    padding: 2px 5px;
+    border: 1px solid #4a90e2;
+    border-radius: 3px;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+    width: 80%;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+.select {
+    background-color: #e0f0ff;
+    outline: 1px solid #4a90e2;
+}.rename-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.rename-modal-content {
+    background: white;
+    width: 400px;
+    max-width: 90%;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+.rename-modal-header {
+    padding: 15px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.rename-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.close-modal {
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.rename-modal-body {
+    padding: 20px;
+}
+
+.rename-input {
+    width: 100%;
+    padding: 8px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.rename-input:focus {
+    border-color: #4a90e2;
+    outline: none;
+}
+
+.error-message {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-top: 5px;
+    min-height: 18px;
+}
+
+.rename-modal-footer {
+    padding: 15px;
+    background: #f5f5f5;
+    border-top: 1px solid #ddd;
+    text-align: right;
+}
+
+.rename-modal-footer button {
+    padding: 8px 15px;
+    margin-left: 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.cancel-btn {
+    background: #e0e0e0;
+}
+
+.confirm-btn {
+    background: #4a90e2;
+    color: white;
+}
+.notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    z-index: 1000;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+        </style>
+    </head>
+    <body>
+        <div class="file-manager-container">
+            <div class="left-panel">
+                <div class="panel-header">
+                    <h3>Folders</h3>
+                    <button id="new-folder-btn" class="icon-btn" title="New Folder">
+                        <i class="fas fa-folder-plus"></i>
+                    </button>
+                </div>
+                <div class="folder-tree" id="folder-tree"></div>
+            </div>
+            <!-- File List -->
+            <div class="right-panel">
+                <div class="cm-address-bar-search" clear>
+                    <div class="address-search">
+                        <div class="pos">
+                            <input type="text" class="address-search-input" id="breadcrumbs">
+                            <div class="cm-button address-button">
+                                <i class="fas fa-arrow-right"></i>
+                            </div>
+                            <div class="address-short-btn"></div>
+                        </div>
+                    </div>
+                    <div class="search-file-and-folder">
+                        <div class="pos">
+                            <input placeholder="Search.." type="text" class="files-search-input">
+                            <div class="cm-button file-search-button">
+                                <i class="fas fa-search"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="theme-structure big-file-manager" id="file-list">
+                    <ul></ul>
+                </div>
+            </div>
+        </div>
+        <!-- partial -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        <script src="https://use.fontawesome.com/releases/v5.0.6/js/all.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+        <script>
+      const fileSystemData = {
+      "name": "Root",
+      "type": "folder",
+      "path": "/",
+      "children": [
+        {
+          "name": "Project 01",
+          "type": "folder",
+          "path": "/Project 01",
+          "children": []
+        },
+        {
+          "name": "Assets",
+          "type": "folder",
+          "path": "/Assets",
+          "children": [
+            {
+              "name": "image",
+              "type": "folder",
+              "path": "/Assets/image",
+              "children": [
+                {
+                  "name": "movie.mp4",
+                  "type": "video",
+                  "path": "/Assets/image/movie.mp4",
+                  "id": "sdfsdfsdfsdf45456sd"
+                },
+                {
+                  "name": "cat.png",
+                  "type": "image",
+                  "path": "/Assets/image/cat.png",
+                  "id": "sdfsdfsdf454"
+                }
+              ]
+            },
+            {
+              "name": "fonts",
+              "type": "folder",
+              "path": "/Assets/fonts",
+              "children": [
+                {
+                  "name": "A-1",
+                  "type": "folder",
+                  "path": "/Assets/fonts/A-1",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Pages",
+          "type": "folder",
+          "path": "/Pages",
+          "children": [
+            {
+              "name": "main.html",
+              "type": "html",
+              "path": "/Pages/main.html",
+              "id": "5"
+            },
+            {
+              "name": "error.php",
+              "type": "php",
+              "path": "/Pages/error.php",
+              "id": "6"
+            }
+          ]
+        }
+      ]
+    };
+function showRenameModal(item, $element) {
+    // Buat modal HTML
+    const modalHtml = `
+        <div class="rename-modal">
+            <div class="rename-modal-content">
+                <div class="rename-modal-header">
+                    <h3>Rename Item</h3>
+                    <span class="close-modal">&times;</span>
+                </div>
+                <div class="rename-modal-body">
+                    <p>Current name: <strong>${item.name}</strong></p>
+                    <input type="text" id="newItemName" class="rename-input" value="${item.name}" placeholder="Enter new name">
+                    <div class="error-message"></div>
+                </div>
+                <div class="rename-modal-footer">
+                    <button class="cancel-btn">Cancel</button>
+                    <button class="confirm-btn">Rename</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Tambahkan modal ke body
+    $('body').append(modalHtml);
+    
+    // Fokus ke input field
+    $('#newItemName').focus().select();
+    
+    // Handle events
+    $('.rename-modal').on('click', '.close-modal, .cancel-btn', function() {
+        $('.rename-modal').remove();
+    });
+    
+    $('.rename-modal').on('click', '.confirm-btn', function() {
+        processRename(item, $element);
+    });
+    
+    $('#newItemName').on('keyup', function(e) {
+        if (e.which === 13) { // Enter key
+            processRename(item, $element);
+        } else if (e.which === 27) { // ESC key
+            $('.rename-modal').remove();
+        }
+    });
+}
+function showNotification(message) {
+    const $notification = $('<div class="notification">' + message + '</div>');
+    $('body').append($notification);
+    setTimeout(() => $notification.fadeOut(() => $notification.remove()), 3000);
+}
+function processRename(item, $element) {
+    const newName = $('#newItemName').val().trim();
+    const $errorMsg = $('.error-message');
+    $errorMsg.empty();
+    
+    // Validasi
+    if (!newName) {
+        $errorMsg.text('Name cannot be empty');
+        return;
+    }
+    
+    if (newName === item.name) {
+        $('.rename-modal').remove();
+        return;
+    }
+    
+    // Cek parent folder untuk menghindari duplikat
+    const parentPath = item.path.split('/').slice(0, -1).join('/') || '/';
+    const parent = findItemByPath(parentPath);
+    
+    if (parent && parent.children.some(child => child.name === newName)) {
+        $errorMsg.text('An item with this name already exists');
+        return;
+    }
+    
+    // Update struktur data
+    const oldPath = item.path;
+    item.name = newName;
+    item.path = `${parentPath}/${newName}`;
+    
+    // Update paths untuk children jika ini folder
+    if (item.children) {
+        updateChildrenPaths(item, oldPath, item.path);
+    }
+    
+    // Update tampilan
+    $element.find('b').html(`<i class="${getIconClass(item.type)}"></i> ${newName}`);
+    $element.attr('data-path', item.path);
+    
+    // Update folder tree
+    updateFolderTreeItem(item, item.name, newName);
+    
+    // Tutup modal
+    $('.rename-modal').remove();
+    
+    // Beri notifikasi
+    showNotification(`Item renamed to "${newName}"`);
+}
+function rename(){
+const $selected = $('.select');
+    if ($selected.length === 0) {
+        alert('Please select an item first');
+        return;
+    }
+    
+    const path = $selected.attr('data-path');
+    const item = findItemByPath(path);
+    
+    if (item) {
+        showRenameModal(item, $selected);
+    } else {
+        alert('Item not found in data structure');
+    }
+}
+// Fungsi untuk menangani rename file/folder
+
+
+// Fungsi utama untuk rename
+function renameItem($element, item) {
+    // Simpan nama asli dan path parent
+    const originalName = item.name;
+    const parentPath = item.path.split('/').slice(0, -1).join('/') || '/';
+    const parent = findItemByPath(parentPath);
+    
+    // Buat input field untuk rename
+    const $b = $element.find('b');
+    const currentName = $b.text().trim();
+    const $input = $(`<input type="text" class="rename-input" value="${currentName}">`);
+    
+    // Ganti teks dengan input field
+    $b.empty().append($input);
+    $input.focus();
+    $input.select();
+    
+    // Handle proses rename
+    $input.on('blur keyup', function(e) {
+        // Hanya proses jika tekan Enter atau klik di luar
+        if (e.type === 'blur' || (e.type === 'keyup' && e.which === 13)) {
+            const newName = $input.val().trim();
+            
+            // Validasi
+            if (!newName || newName === originalName) {
+                cancelRename($b, item);
+                return;
+            }
+            
+            // Cek nama duplikat
+            if (parent.children.some(child => child.name === newName)) {
+                alert('An item with this name already exists');
+                $input.select();
+                return;
+            }
+            
+            // Update struktur data
+            updateItemName(item, newName, parentPath);
+            
+            // Update tampilan
+            $b.empty().append(`<i class="${getIconClass(item.type)}"></i> ${newName}`);
+            $element.attr('data-path', item.path);
+            
+            // Update tree view jika perlu
+            updateFolderTreeItem(item, originalName, newName);
+            
+            // Perbarui seluruh tampilan
+            renderFileManager();
+        }
+    });
+    
+    // Handle escape key
+    $input.on('keyup', function(e) {
+        if (e.which === 27) { // ESC key
+            cancelRename($b, item);
+        }
+    });
+}
+
+// Fungsi bantuan untuk cancel rename
+function cancelRename($b, item) {
+    $b.empty().append(`<i class="${getIconClass(item.type)}"></i> ${item.name}`);
+}
+
+// Update nama item di struktur data
+function updateItemName(item, newName, parentPath) {
+    const oldPath = item.path;
+    item.name = newName;
+    item.path = `${parentPath}/${newName}`;
+    
+    // Update path untuk semua children jika ini folder
+    if (item.children) {
+        updateChildrenPaths(item, oldPath, item.path);
+    }
+}
+
+// Update path untuk children
+function updateChildrenPaths(item, oldPath, newPath) {
+    item.children.forEach(child => {
+        child.path = child.path.replace(oldPath, newPath);
+        if (child.children) {
+            updateChildrenPaths(child, oldPath, newPath);
+        }
+    });
+}
+
+// Update tree view setelah rename
+function updateFolderTreeItem(item, oldName, newName) {
+    $(`#folder-tree .folder:contains('${oldName}')`).text(newName)
+        .attr('data-path', item.path);
+}
+
+// Fungsi untuk mendapatkan icon class
+function getIconClass(type) {
+    switch(type) {
+        case 'folder': return 'fas fa-folder';
+        case 'image': return 'far fa-images';
+        case 'video': return 'fas fa-video';
+        case 'html': 
+        case 'css': 
+        case 'js': 
+        case 'php': return 'fas fa-file';
+        default: return 'fas fa-file';
+    }
+}
+function findItemByPath(path) {
+    const parts = path.split('/').filter(p => p !== '');
+    let currentItem = fileSystemData;
+    
+    for (const part of parts) {
+      const found = currentItem.children?.find(child => child.name === part);
+      if (!found) return null;
+      currentItem = found;
+    }
+    
+    return currentItem;
+  }
+
+  // Inisialisasi
+  let currentPath = '/';
+  let clipboard = null;
+  let clipboardAction = null; // 'copy' or 'cut'
+
+  // Render seluruh file manager
+  function renderFileManager() {
+    renderFolderTree();
+    renderFileList(currentPath);
+    updateBreadcrumbs(currentPath);
+  }
+
+  // Render folder tree di panel kiri
+  function renderFolderTree() {
+    const $folderTree = $('#folder-tree');
+    $folderTree.empty();
+    renderFolderTreeItem(fileSystemData, $folderTree);
+  }
+
+  function renderFolderTreeItem(item, $container, depth = 0) {
+    if (item.type !== 'folder') return;
+
+    const $folder = $('<div class="folder"></div>');
+    $folder.text(item.name);
+    $folder.attr('data-path', item.path);
+    
+    if (depth > 0) {
+      $folder.addClass('child-folder');
+    }
+
+    $folder.on('click', function(e) {
+      e.stopPropagation();
+      currentPath = item.path;
+      renderFileList(currentPath);
+      updateBreadcrumbs(currentPath);
+    });
+
+    $container.append($folder);
+
+    if (item.children && item.children.length > 0) {
+      const $childrenContainer = $('<div class="children"></div>');
+      $container.append($childrenContainer);
+      
+      item.children.forEach(child => {
+        renderFolderTreeItem(child, $childrenContainer, depth + 1);
+      });
+    }
+  }
+
+  // Render file list di panel kanan
+  function renderFileList(path) {
+    const $fileList = $('#file-list ul');
+    $fileList.empty();
+    
+    const currentFolder = findItemByPath(path);
+    if (!currentFolder || !currentFolder.children) return;
+
+    currentFolder.children.forEach(item => {
+      const $li = $('<li></li>');
+      $li.attr('data-file-icon', item.type);
+      if (item.id) $li.attr('data-file-id', item.id);
+      $li.attr('data-path', item.path);
+      
+      const $b = $('<b></b>');
+      
+      // Tambahkan icon berdasarkan type
+      let iconClass = '';
+      switch(item.type) {
+        case 'folder': iconClass = 'fas fa-folder'; break;
+        case 'image': iconClass = 'far fa-images'; break;
+        case 'video': iconClass = 'fas fa-video'; break;
+        case 'html': 
+        case 'css': 
+        case 'js': 
+        case 'php': iconClass = 'fas fa-file'; break;
+        default: iconClass = 'fas fa-file';
+      }
+      
+      $b.prepend(`<i class="${iconClass}"></i> `);
+      $b.append(item.name);
+      
+      $li.append($b);
+      
+      if (item.type === 'folder' && item.children && item.children.length > 0) {
+        const $childUl = $('<ul></ul>');
+        $li.append($childUl);
+        item.children.forEach(child => {
+          const $childLi = $('<li></li>');
+          $childLi.attr('data-file-icon', child.type);
+          if (child.id) $childLi.attr('data-file-id', child.id);
+          $childLi.attr('data-path', child.path);
+          
+          const $childB = $('<b></b>');
+          $childB.prepend(`<i class="${getIconClass(child.type)}"></i> `);
+          $childB.append(child.name);
+          
+          $childLi.append($childB);
+          $childUl.append($childLi);
+        });
+      }
+    
+      $fileList.append($li);
+    });
+
+    // Tambahkan event handlers
+    addFileListEventHandlers();
+  }
+ 
+  function getIconClass(type) {
+    switch(type) {
+      case 'folder': return 'fas fa-folder';
+      case 'image': return 'far fa-images';
+      case 'video': return 'fas fa-video';
+      case 'html': 
+      case 'css': 
+      case 'js': 
+      case 'php': return 'fas fa-file';
+      default: return 'fas fa-file';
+    }
+  }
+
+  // Update breadcrumbs
+  function updateBreadcrumbs(path) {
+    const $breadcrumbs = $('#breadcrumbs');
+    const $addressShortBtn = $('.address-short-btn');
+    
+    $breadcrumbs.val(path);
+    $addressShortBtn.empty();
+    
+    const parts = path.split('/').filter(p => p !== '');
+    let currentPath = '';
+    
+    parts.forEach((part, index) => {
+      currentPath += `/${part}`;
+      const $crumb = $(`<div data-address="${currentPath}"><span>${part}</span></div>`);
+      if (index < parts.length - 1) {
+        $crumb.append('<i class="fas fa-caret-right"></i>');
+      }
+      $addressShortBtn.append($crumb);
+    });
+    
+    // Tambahkan event handler untuk breadcrumbs
+    $('[data-address]').on('click', function() {
+      currentPath = $(this).attr('data-address');
+      renderFileList(currentPath);
+      updateBreadcrumbs(currentPath);
+    });
+  }
+
+  // Cari item berdasarkan path
+  
+
+  // Tambahkan event handlers untuk file list
+  function addFileListEventHandlers() {
+    $('[data-file-icon="folder"]').on('dblclick', function() {
+      const path = $(this).attr('data-path');
+      currentPath = path;
+      renderFileList(currentPath);
+      updateBreadcrumbs(currentPath);
+    });
+    
+    $('[data-file-icon]').on('click', function(e) {
+      e.stopPropagation();
+      $('[data-file-icon]').removeClass('select');
+      $(this).addClass('select');
+    });
+  }
+
+$(document).on('dblclick', '.big-file-manager ul li.has-files-of-folder', function(e) {
+    $('.big-file-manager ul').removeClass('active-folder-wrapper');
+    $(this).children('ul').addClass('active-folder-wrapper');
+    $(this).siblings('li').hide();
+    $(this).addClass('file-sub-active').children('ul').show();
+});
+$(document).on('dblclick', '.big-file-manager ul li.has-files-of-folder', function(e) {
+    $('.has-files-of-folder').removeClass('show-up').addClass('hide-up');
+    $(this).addClass('show-up').removeClass('hide-up');
+});
+$(document).on('dblclick', '.big-file-manager ul li', function(e) {
+    e.stopPropagation();
+});
+$(document).on('click', '.cm-folder-back', function(e) {
+    e.stopPropagation();
+    $('.big-file-manager ul').removeClass('active-folder-wrapper');
+    $(this).parent('b').closest('ul').addClass('active-folder-wrapper');
+    $(this).closest('.file-sub-active').siblings('li').show();
+    $(this).closest('.file-sub-active').removeClass('file-sub-active');
+    $(this).closest('.has-files-of-folder').find('ul').hide();
+    $('.has-files-of-folder').removeClass('show-up').addClass('hide-up');
+    $(this).closest('.file-sub-active').addClass('show-up').removeClass('hide-up');
+    $(this).parent('b').next('ul').children('li').removeClass('select');
+});
+$(document).on('dblclick click','.big-file-manager ul li,.cm-folder-back',function(e) {
+    var text = $('.show-up[data-file-icon]').attr('data-path');
+	if(text){
+		if(text.indexOf("/")){
+			$('.address-search-input').val(text);
+			var getAddressData = text.toString().split('/');
+			$('.address-short-btn').empty();
+			for(var i=0;i<getAddressData.length;i++){
+				$('.address-short-btn').append('<div data-address><span>'+getAddressData[i]+'</span><i class="fas fa-caret-right"></i></div>');
+			}
+			var getSearchPlaceholder = $('.big-file-manager.theme-structure ul > li.show-up > b').text();
+			$('.files-search-input').attr('placeholder','Search in '+getSearchPlaceholder);
+		}else{
+			$('.address-short-btn').empty();
+			$('.address-short-btn').append('<div data-address><span>'+text+'</span></div>');
+			$('.files-search-input').attr('placeholder','Search..');
+		}
+	}else{
+		$('.address-short-btn').empty();
+		$('.address-search-input').val('');
+		$('.files-search-input').attr('placeholder','Search..');
+		return false;
+	}
+});
+/*----------Folder Default Behaviour----------|END------*/
+/*---------Context Menu Start------------|START---------*/
+$(document).on('contextmenu', '[data-file-icon]:not(.show-up)', function(e) {
+    var off = $(this).offset();
+    var topPos = e.pageY;
+    var leftPos = e.pageX;
+    $('.append-option-box').remove();
+    $(this).addClass('context-visible').addClass('select');
+    $(this).append(`<div class="append-option-box" style="top:` + topPos + `px;left:` + leftPos + `px;">
+          <div class="inner-contenxt-box">
+              <div data-rename="rename" onclick="rename()">Rename</div>
+              <div data-function="data-delete" onclick="deleteData()">Delete</div>
+          </div>
+      </div>
+      `);
+    $('.append-option-box>div>div:has(div)').addClass('has-sub-context');
+    if ($(this).attr('data-file-icon') != "folder") {
+        // $('.append-option-box .inner-contenxt-box').append('<div data-function="data-copy-path">Copy Path</div>');
+        // $('.append-option-box .inner-contenxt-box').append('<div data-function="data-copy-secure-path">Copy Secure Path</div>');
+    }
+    return false;
+});
+
+$(document).on('contextmenu', '.theme-structure', function(e) {
+    var off = $(this).offset();
+    var topPos = e.pageY;
+    var leftPos = e.pageX;
+    $('.append-option-box').remove();
+    $(this).append(`<div class="append-option-box" style="top:` + topPos + `px;left:` + leftPos + `px;">
+                <div class="inner-contenxt-box">
+                    <div data-function="view">
+                        <span>View</span>
+                        <div class="main-sub-menu">
+                            <div data-size="small">Small</div>
+                            <div data-size="medium">Medium</div>
+                            <div data-size="large">Large</div>
+                        </div>
+                    </div>
+                    
+                    <div data-function="new">
+                        <span>New Files</span>
+                        <div class="main-sub-menu">
+                            <div data-new-file="html">HTML File</div>
+                            <div data-new-file="css">CSS File</div>
+                            <div data-new-file="js">JS File</div>
+                            <div data-new-file="php">PHP File</div>
+                            <div data-new-file="txt">Custom File</div>
+                        </div>
+                    </div>
+                    <div data-new-folder="new">New Folder</div>
+                </div>
+            </div>
+            `);
+    $('.append-option-box>div>div:has(div)').addClass('has-sub-context');
+    $('.has-sub-context').append('<i class="fas fa-chevron-right"></i>');
+    return false;
+});
+$(document).on('click contextmenu dblclick', function() {
+    $('[data-file-icon]').removeClass('context-visible').removeClass('select renaming');
+    $('.append-option-box').remove();
+	removeUnwanted();
+	$('.name').attr('contenteditable', false);
+});
+$(document).on('click contextmenu', '.append-option-box', function(e) {
+    e.stopPropagation();
+    $('[data-file-icon]').removeClass('context-visible').removeClass('select');
+    $('.append-option-box').remove();
+});
+$(document).on('click contextmenu', '[data-file-icon]', function(e) {
+    e.stopPropagation();
+});
+function pasteData() {
+    $('.data-moving').each(function() {
+        if ($('.active-folder-wrapper:has(.no-item-inside-folder)')) {
+            $('.active-folder-wrapper.no-item-inside-folder').children('span').remove();
+            $('.active-folder-wrapper.no-item-inside-folder').removeClass('no-item-inside-folder');
+            $(this).clone().removeClass('data-copy').appendTo('.active-folder-wrapper');
+            $('.active-folder-wrapper').find('li').show();
+            $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+            $(this).remove();
+        } else {
+            $(this).clone().removeClass('data-copy').appendTo('.active-folder-wrapper');
+            $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+            $(this).remove();
+        }
+    });
+    $('.data-copy').each(function() {
+        if ($('.active-folder-wrapper:has(.no-item-inside-folder)')) {
+            $('.active-folder-wrapper.no-item-inside-folder').children('span').remove();
+            $('.active-folder-wrapper.no-item-inside-folder').removeClass('no-item-inside-folder');
+            $(this).clone().removeClass('data-copy').appendTo('.active-folder-wrapper');
+            $('.active-folder-wrapper').find('li').show();
+            $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+        } else {
+            $(this).clone().removeClass('data-copy').appendTo('.active-folder-wrapper');
+            $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+        }
+    });
+}
+
+function deleteData() {
+  
+        const $selected = $('.select');
+        if ($selected.length === 0) {
+            alert('No item selected');
+            return;
+        }
+
+        const path = $selected.attr('data-path');
+        if (!path) {
+            alert('No path found for selected item');
+            return;
+        }
+
+        const item = findItemByPath(path);
+        if (!item) {
+            alert('Item not found in data structure');
+            return;
+        }
+
+        deleteItem(item, path);
+        
+        return false;
+    
+}
+
+$(window).on('keydown', function(ev) {
+    if (ev.keyCode === 39) { /*left arrow*/
+        $('.select').next('[data-file-icon]').addClass('select').siblings().removeClass('select');
+    } else if (ev.keyCode === 37) { /*right arrow*/
+        $('.select').prev('[data-file-icon]').addClass('select').siblings().removeClass('select');
+    } else if (ev.keyCode === 13) { /*enter*/
+        $('.select:not(:last)').each(function() {
+            $(this).removeClass('select');
+        });
+        $('.select').dblclick();
+    } else if (ev.ctrlKey && ev.keyCode === 88) { /*move*/
+        $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+        $('.select').addClass('data-moving').removeClass('data-copy');
+        return false;
+    } else if (ev.ctrlKey && ev.keyCode === 67) { /*copy*/
+        $('.data-moving,.data-copy').removeClass('data-moving').removeClass('data-copy');
+        $('.select').addClass('data-copy').removeClass('data-moving');
+        return false;
+    } else if (ev.ctrlKey && ev.keyCode === 86) { /*paste*/
+        pasteData();
+        createFileAndFolderDataBase();
+    } else if (ev.keyCode === 46) { /*delete*/
+        deleteData();
+    } else if (ev.keyCode === 27 || ev.keyCode === 8) { /*Back*/
+        $('.big-file-manager.theme-structure ul > li.show-up > b > .cm-folder-back').click();
+    } else if (ev.ctrlKey && ev.keyCode === 65) { /*Shift Select*/
+
+    } else  if (ev.which === 113 && $('.select').length) { // F2 key
+        ev.preventDefault();
+        const $selected = $('.select');
+        const path = $selected.attr('data-path');
+        const item = findItemByPath(path);
+        if (item) showRenameModal(item, $selected);
+    }
+});
+/*---------Select Folder------------|START---------*/
+$(document).on('click', '[data-file-icon]', function(e) {
+    if (e.ctrlKey) {
+        $(this).addClass('select');
+		$(this).removeClass('renaming');
+    } else {
+        $('.select').removeClass('select');
+        $(this).addClass('select').siblings().removeClass('select');
+		$(this).removeClass('renaming');
+    }
+});
+
+
+function createFileAndFolderDataBase() {
+    $('.big-file-manager.theme-structure > ul li').each(function() {
+        var folderSlug = $(this).children('b').not('.cm-folder-back').text().toLowerCase().split(' ').join('-');
+        $(this).attr('data-slug', folderSlug);
+    });
+    $('[data-slug]').each(function() {
+        var b = $(this).attr('data-slug');
+        var a = $(this).parents('li').map(function() {
+            return $(this).attr('data-slug');
+        }).get().reverse().join("/");
+		if(a==""){
+			$(this).attr('data-path',b);
+		}else{
+			$(this).attr('data-path', a + "/" + b);
+		}
+        
+    });
+    var folderStructureJson = [];
+    $('[data-file-id]').each(function() {
+        var folderStructure = {};
+        var fileID = $(this).attr('data-file-id');
+        var filePath = $(this).attr('data-path');
+        folderStructure.fileID = "{{" + fileID + "}}";
+        folderStructure.filePath = filePath;
+        folderStructureJson.push(folderStructure);
+    });
+}
+createFileAndFolderDataBase();
+
+$(document).on('click', '[data-size]', function() {
+    var getSize = $(this).attr('data-size');
+    $('.big-file-manager').removeClass('small medium large');
+    $('.big-file-manager').addClass(getSize);
+});
+
+function removeUnwanted(){
+	$('.active-folder-wrapper ~ .active-folder-wrapper,.active-folder-wrapper ~ .no-item-inside-folder').remove();
+}
+$(document).on('click', '[data-new-folder]', function() {
+ 
+ new_data();
+
+});
+$(document).on('click', '[data-new-file]', function() {
+ 
+ new_data($(this).data('new-file'),$(this).data('new-file'));
+
+});
+
+$('.address-search-input').focus(function(){
+	$('.address-short-btn').hide();
+	$(this).select();
+}).blur(function(){
+	$('.address-short-btn').show();
+});
+function filesAndFolderIcons(newData) {
+    function letGoSmallA(a) {
+        var getType = $(a).attr('data-file-icon');
+        if (getType == "folder") {
+            $(a).children('b').prepend('<i class="fas fa-folder"></i>');
+        } else if (getType == "html" || getType == "css" || getType == "js" || getType == "php") {
+            $(a).children('b').prepend('<i class="fas fa-file"></i>');
+        } else if (getType == "layout") {
+            $(a).children('b').prepend('<i class="fas fa-th-large"></i>');
+        } else if (getType == "image") {
+            $(a).children('b').prepend('<i class="far fa-images"></i>');
+        } else if (getType == "video") {
+            $(a).children('b').prepend('<i class="fas fa-video"></i>');
+        }
+    }
+    if (newData == "newData") {
+        $('[data-new="new"][data-file-icon]').each(function() {
+            letGoSmallA(this);
+        });
+    } else {
+        $('[data-file-icon]').each(function() {
+            letGoSmallA(this);
+        });
+    }
+}
+function allStructure() {
+    // Reset semua kelas yang mungkin sudah ada
+    $('#file-list ul li').removeClass('empty-folder has-files-of-folder file-sub-active show-up hide-up');
+    $('.no-item-inside-folder, .cm-folder-back').remove();
+    
+    // Tandai folder kosong
+    $('#file-list ul li[data-file-icon="folder"]:not(:has(ul))').each(function() {
+        const $folder = $(this);
+        const folderPath = $folder.attr('data-path');
+        const folderData = findItemByPath(folderPath);
+        
+        // Jika folder benar-benar kosong (tidak ada children di data)
+        if (!folderData || !folderData.children || folderData.children.length === 0) {
+            $folder.addClass('empty-folder')
+                .append('<ul class="no-item-inside-folder"><span>This folder has no items.</span></ul>');
+        }
+    });
+    
+    // Tambahkan tombol back untuk folder yang memiliki isi
+    $('#file-list ul li:has(ul)').addClass('has-files-of-folder').each(function() {
+        const $folder = $(this);
+        
+        // Hanya tambahkan tombol back jika bukan di root level
+        if ($folder.closest('#file-list').find('> ul > li').is($folder)) {
+            return;
+        }
+        
+        $folder.children('b').prepend(
+            '<i title="Back" class="cm-folder-back"><i class="fas fa-angle-left"></i></i>'
+        );
+    });
+}
+
+// Event handler untuk double click folder
+$(document).on('dblclick', '.big-file-manager ul li[data-file-icon="folder"]', function(e) {
+    e.stopPropagation();
+    const path = $(this).attr('data-path');
+    currentPath = path;
+    renderFileList(currentPath);
+    updateBreadcrumbs(currentPath);
+    
+    // Update kelas untuk tampilan
+    $('.has-files-of-folder').removeClass('show-up').addClass('hide-up');
+    $(this).addClass('show-up').removeClass('hide-up');
+});
+
+// Event handler untuk tombol back
+$(document).on('click', '.cm-folder-back', function(e) {
+    e.stopPropagation();
+    const $folder = $(this).closest('li');
+    const $parentFolder = $folder.parent().closest('li');
+    
+    if ($parentFolder.length) {
+        const parentPath = $parentFolder.attr('data-path');
+        currentPath = parentPath;
+        renderFileList(currentPath);
+        updateBreadcrumbs(currentPath);
+        
+        // Update kelas untuk tampilan
+        $parentFolder.addClass('show-up').removeClass('hide-up');
+        $folder.removeClass('show-up').addClass('hide-up');
+    }
+});
+
+
+// Event handler untuk update address bar saat navigasi
+$(document).on('dblclick click', '.big-file-manager ul li,.cm-folder-back', function(e) {
+    const path = $(this).attr('data-path');
+    if (path) {
+        if (path.indexOf("/")) {
+            $('.address-search-input').val(path);
+            const getAddressData = path.toString().split('/');
+            $('.address-short-btn').empty();
+            
+            for (let i = 0; i < getAddressData.length; i++) {
+                if (getAddressData[i]) {
+                    $('.address-short-btn').append(
+                        `<div data-address="${getAddressData.slice(0, i+1).join('/')}">
+                            <span>${getAddressData[i]}</span>
+                            ${i < getAddressData.length - 1 ? '<i class="fas fa-caret-right"></i>' : ''}
+                        </div>`
+                    );
+                }
+            }
+            
+            const getSearchPlaceholder = $('.big-file-manager.theme-structure ul > li.show-up > b').text();
+            $('.files-search-input').attr('placeholder', 'Search in ' + getSearchPlaceholder);
+        } else {
+            $('.address-short-btn').empty();
+            $('.address-short-btn').append(`<div data-address="${path}"><span>${path}</span></div>`);
+            $('.files-search-input').attr('placeholder', 'Search..');
+        }
+    } else {
+        $('.address-short-btn').empty();
+        $('.address-search-input').val('');
+        $('.files-search-input').attr('placeholder', 'Search..');
+    }
+});
+
+  // New folder button
+  
+  function new_data(type='folder',ext=""){
+    const parent = findItemByPath(currentPath);
+    if (!parent) return;
+    
+    let newDataName;
+    if(type=='folder')
+    newDataName = 'New Folder';
+    else
+    newDataName = 'New File.'+ext;
+
+    let DataName = newDataName;
+    let counter = 1;
+    
+    // Cari nama Data yang unik
+    while (parent.children?.some(child => child.name === DataName)) {
+      DataName = `${newDataName} (${counter++})`;
+    }
+    
+    const newData = {
+      name: DataName,
+      type: type,
+      path: `${currentPath}/${DataName}`
+    };
+    
+    if (!parent.children) parent.children = [];
+    parent.children.push(newData);
+    
+    renderFileManager();
+  }
+   
+
+function updatePaths(item, parentPath) {
+    const oldPath = item.path;
+    item.path = parentPath ? `${parentPath}/${item.name}` : `/${item.name}`;
+    
+    if (item.children) {
+        item.children.forEach(child => {
+            updatePaths(child, item.path);
+        });
+    }
+}
+
+function deleteItem(item, path) {
+    if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+        const parentPath = path.split('/').slice(0, -1).join('/');
+        const parent = findItemByPath(parentPath);
+        
+        if (parent && parent.children) {
+            parent.children = parent.children.filter(child => child.name !== item.name);
+            renderFileManager();
+            showNotification('Item deleted');
+        }
+    }
+}
+
+  renderFileManager();
+        </script>
+    </body>
+</html>

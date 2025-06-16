@@ -1,0 +1,15 @@
+FROM oven/bun:1.0 as builder
+
+WORKDIR /app
+COPY . .
+
+RUN bun install
+RUN bun build ./src/index.ts --outfile ./dist/index.js
+
+FROM oven/bun:1.0
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3000
+CMD ["bun", "run", "src/index.ts"]
