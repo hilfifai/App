@@ -294,7 +294,7 @@ export default {
             newName: newName
           }
         } else {
-          endpoint = `http://localhost:3000/file/${selectedItem.value.id}/rename`
+          endpoint = `http://localhost:3000/files/${selectedItem.value.id}/rename`
           payload = {
             filePath: selectedItem.value.path,
             newName: newName
@@ -319,7 +319,7 @@ export default {
               }
             }
           }
-          
+            await fetchFileStructure();
           showNotification(`"${selectedItem.value.name}" renamed to "${newName}"`)
           closeModal()
         } else {
@@ -356,7 +356,7 @@ export default {
           endpoint = `http://localhost:3000/folders/${item.id}`
           payload = { folderPath: item.path }
         } else {
-          endpoint = `http://localhost:3000/file/${item.id}`
+          endpoint = `http://localhost:3000/files/${item.id}`
           payload = { filePath: item.path }
         }
         
@@ -373,6 +373,7 @@ export default {
           showNotification(`"${item.name}" deleted`)
           clearSelection()
         } else {
+          await fetchFileStructure();
           showNotification(response.data.message || 'Failed to delete item')
         }
       } catch (error) {
@@ -438,13 +439,14 @@ export default {
         
         const response = await axios.post('http://localhost:3000/files', {
           parentPath: currentPath.value,
+          folderId: parent.id,
           name: fileName,
           fileType: type,
           "mimeType": "text/plain",
           "url": "/uploads/example.txt"
         })
         
-        if (response.data.success) {
+        if (response.data && response.data.id) {
           if (!parent.children) parent.children = []
           
           parent.children.push({
@@ -456,7 +458,8 @@ export default {
            await fetchFileStructure()
           showNotification(`File "${fileName}" created`)
         } else {
-          showNotification(response.data.message || 'Failed to create file')
+          showNotification(response.data.message || 'Failed to create file');
+           await fetchFileStructure()
         }
       } catch (error) {
         console.error('Error creating file:', error)
